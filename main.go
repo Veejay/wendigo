@@ -3,8 +3,9 @@ package main
 import "fmt"
 import "net/http"
 import "log"
+import "os"
 
-// Handles the initial GET on /search 
+// Handles the initial GET on /
 func searchGetHandler(w http.ResponseWriter, r *http.Request) {
   // FIXME: Use templates for all this
   searchForm := `
@@ -28,11 +29,29 @@ func searchGetHandler(w http.ResponseWriter, r *http.Request) {
   `
   fmt.Fprintf(w, searchForm)
 }
-// This should be hooked to the main chunk of the (i.e. once the directory
+
+// TODO: This should be hooked to the main chunk of the (i.e. once the directory
 // and the search term have been obtained, we should launch the crawling)
+
+// Handles POST requests to /search
 func searchPostHandler(w http.ResponseWriter, r *http.Request) {
-  fmt.Printf("The search term provided by the user is: %s\n", r.FormValue("term"))
-  fmt.Printf("The name of the directory provided by the user is: %s\n", r.FormValue("directory"))
+  directoryName, searchTerm := r.FormValue("directory"), r.FormValue("term")
+  fmt.Println(directoryName)
+  fmt.Println(searchTerm)
+  dirHandle, err := os.Open(directoryName)
+  if err != nil {
+    log.Fatal("Error while trying to open the directory: ", err)
+    os.Exit(1)
+  }
+  // Read all the contents of the directory at once 
+  // (See http://golang.org/pkg/os/#File.Readdir)
+  files, err := dirHandle.Readdir(0)
+  if err != nil {
+    log.Fatal("Error while reading the contents of the directory: ", err)
+  }
+  for _, f := range files {
+    fmt.Println(f.Name())
+  }
 }
 
 func main() {
