@@ -1,9 +1,13 @@
 package main
 
-import "fmt"
-import "net/http"
-import "log"
-import "os"
+import (
+  "fmt"
+  "net/http"
+  "log"
+  "io"
+  "os"
+  "bufio"
+)
 
 // Handles the initial GET on /
 func searchGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +69,32 @@ func searchPostHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+// Signature copied from fmt.Printf
+// See http://golang.org/pkg/fmt/#Printf
+func PrintFile(fileName string) (n int, err error) {
+  file, err := os.Open("/Users/bertrand/diff_branches.txt")
+  if err != nil {
+    fmt.Printf("Error while opening a file: ", err)
+  }
+  defer file.Close()
+  fileReader := bufio.NewReader(file)
+  for {
+    line, err := fileReader.ReadString('\n')
+    if err != nil {
+      if err != io.EOF {
+        fmt.Println(err)
+      }
+      break
+    }
+    fmt.Print(line)
+  }
+  // Faking it for now, I still don't know how to "save" 
+  // that piece of code in a function
+  return 100, nil
+}
+
 func main() {
+
   http.HandleFunc("/", searchGetHandler)
   // Not clear exactly what should be used to discriminate between GETs and POSTs
   // Maybe http.Request.Method??
