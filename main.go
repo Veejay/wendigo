@@ -36,9 +36,15 @@ func searchGetHandler(w http.ResponseWriter, r *http.Request) {
 // Handles POST requests to /search
 func searchPostHandler(w http.ResponseWriter, r *http.Request) {
   directoryName, searchTerm := r.FormValue("directory"), r.FormValue("term")
+
   fmt.Println(directoryName)
   fmt.Println(searchTerm)
+
   dirHandle, err := os.Open(directoryName)
+
+  // Ensure that the file descriptor gets properly closed
+  defer dirHandle.Close()
+
   if err != nil {
     log.Fatal("Error while trying to open the directory: ", err)
     os.Exit(1)
@@ -50,7 +56,12 @@ func searchPostHandler(w http.ResponseWriter, r *http.Request) {
     log.Fatal("Error while reading the contents of the directory: ", err)
   }
   for _, f := range files {
-    fmt.Println(f.Name())
+    // Sorry son, you got a bad case of ugly
+    if f.IsDir() {
+      fmt.Fprintf(w, "%s is a directory\n", f.Name())
+    } else {
+      fmt.Fprintf(w, "%s is a file\n", f.Name())
+    }
   }
 }
 
