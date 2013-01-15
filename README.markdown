@@ -10,7 +10,8 @@ in a given directory that contain that search term with additional lines around 
 
 The code blocks should be syntax-higlighted à la gist (yet not as ugly as gists if possible) and the whole thing should leverage 
 Go's concurrency capabilities if possible (i.e. trying to search in multiples files at a time and returning results to the UI as soon
-as available) because this s**t really gets me going.
+as available) because this s**t really gets me going. I have next to NO idea how realistic or even 
+sensical that is though. Let's say it makes sense for me right now.
 
 Nice to have: 
 -------------
