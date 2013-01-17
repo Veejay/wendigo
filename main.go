@@ -1,5 +1,4 @@
 package main
-
 import (
   "fmt"
   "net/http"
@@ -70,10 +69,24 @@ func searchPostHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func CountFiles(fi []os.FileInfo) (count int) {
+func CountFiles(directoryName string) (count int) {
   count = 0
-  for _, elem := range fi {
-    if !elem.IsDir() {
+  dir, err := os.Open(directoryName)
+  defer dir.Close()
+  if err != nil {
+    fmt.Printf("\nError in CountFiles while trying to open directory %s\n", directoryName)
+    os.Exit(1)
+  }
+  contents, err := dir.Readdir(0)
+  if err != nil {
+    fmt.Println(err)
+    os.Exit(1)
+  }
+  for _, elem := range contents {
+    if elem.IsDir() {
+      count += CountFiles(filepath.Join(directoryName, elem.Name()))
+    } else {
+      // We migth want to handle all the possible cases here see http://golang.org/pkg/os/#FileMode
       count++
     }
   }
@@ -82,9 +95,9 @@ func CountFiles(fi []os.FileInfo) (count int) {
 
 // Greps all the file in a given directory and returns the results 
 // as an array of strings
-func DirGrep(directoryName string, searchTerm string) (matches []string) {
-
+func DirGrep(directoryName string, searchTerm string, leftToProcess int) (matches []string) {
   // Acquire a file handle
+  fmt.Printf("\n    %d files left to process\n", leftToProcess)
   dir, err := os.Open(directoryName)
   defer dir.Close()
   if err != nil {
@@ -97,7 +110,6 @@ func DirGrep(directoryName string, searchTerm string) (matches []string) {
     fmt.Println(err)
     os.Exit(1)
   }
-  leftToProcess := CountFiles(contents)
   // Create a channel so that we can grep all the files concurrently and synchronize
   // (Whatever that means)
   ch := make(chan string)
@@ -108,12 +120,13 @@ func DirGrep(directoryName string, searchTerm string) (matches []string) {
     // If it's a directory we want to 
     // recursively call the DirGrep function on it
     if f.IsDir() {
-      fmt.Printf("\n\nDIRECTORY: %s\n\n", filepath.Join("/Users", "bertrand", "Programming", "wendigo", "test", f.Name()))
-      continue
+      // Gets the contents of the directory (files and subdirectories)
+      fmt.Printf("\nEntering directory %s\n", filepath.Join(directoryName, f.Name()))
+      DirGrep(filepath.Join(directoryName, f.Name()), searchTerm, leftToProcess)
     } else {
-      fmt.Printf("\n\nFILE: %s\n\n", filepath.Join("/Users", "bertrand", "Programming", "wendigo", "test", f.Name()))
+      fmt.Printf("\n* Processing file %s\n", filepath.Join(directoryName, f.Name()))
       go func(fileName string) {
-        stringContents, err := ioutil.ReadFile(filepath.Join("/Users", "bertrand", "Programming", "wendigo", "test", fileName))
+        stringContents, err := ioutil.ReadFile(filepath.Join(directoryName, fileName))
         if err != nil {
           fmt.Println(err)
           os.Exit(1)
@@ -121,10 +134,11 @@ func DirGrep(directoryName string, searchTerm string) (matches []string) {
         lines := strings.Split(string(stringContents), "\n")
         for _, line := range lines {
           if strings.Contains(line, searchTerm) {
-            ch <- fmt.Sprintf("Found the search term in file @@ %s @@\n\n", fileName)
+            ch <- fmt.Sprintf("\n!!! Found the search term in file %s\n", fileName)
           }
         }
         leftToProcess--
+        fmt.Printf("\n    Finished processing %s, %d files left to process", fileName, leftToProcess)
       }(f.Name())
     }
   }
@@ -176,11 +190,31 @@ END:
 /* } */
 
 func main() {
-  found := DirGrep("/Users/bertrand/Programming/wendigo/test", "FOOBAR")
+  /* dir, err := os.Open("/Users/bertrand/Programming/wendigo/test") */
+  /* defer dir.Close() */
+  /* if err != nil { */
+  /*   fmt.Println(err) */
+  /*   os.Exit(1) */
+  /* } */
+  /* // Gets the contents of the directory (files and subdirectories) */
+  /* contents, err := dir.Readdir(0) */
+  /* if err != nil { */
+  /*   fmt.Println(err) */
+  /*   os.Exit(1) */
+  /* } */
+
+  /* fmt.Println(CountFiles(contents)) */
+  dirName := "/Users/bertrand/Programming/wendigo/test"
+  searchTerm := "FOOBAR"
+
+  found := DirGrep(dirName, searchTerm, CountFiles(dirName))
 
   for _, match := range found {
     fmt.Printf("\n\nMATCH: %s\n\n", match)
   }
+
+
+
   /* http.HandleFunc("/", searchGetHandler) */
   /* // Not clear exactly what should be used to discriminate between GETs and POSTs */
   /* // Maybe http.Request.Method?? */
