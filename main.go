@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -73,13 +75,44 @@ func searchTerm(filepath string, term string) (matches []FileMatch) {
 }
 
 func main() {
+	rubySnippet := `
+    def foobar(a, b)
+      if b
+        a.inject(0) do |memo, element|
+          memo += element.fuux
+        end
+      else
+        -1
+      end
+    end
+  `
+	var out bytes.Buffer
+	var err error
+	echo := exec.Command("echo", rubySnippet)
+	pygmentize := exec.Command("pygmentize", "-f", "html", "-l", "ruby")
+
+	pygmentize.Stdin, err = echo.StdoutPipe()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	pygmentize.Stdout = &out
+
+	echo.Start()
+	pygmentize.Start()
+
+	echo.Wait()
+	pygmentize.Wait()
+
+	fmt.Printf("%s", string(out.Bytes()))
+
 	dirName := "/Users/bertrand/Programming/wendigo/test"
 	filepaths := make(chan string)
 
 	go recursiveWalk(dirName, filepaths)
 
 	for path := range filepaths {
-		for _, match := range searchTerm(path, "work_week") {
+		for _, match := range searchTerm(path, "assignments") {
 			fmt.Println(match.String())
 		}
 	}
