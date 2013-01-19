@@ -74,6 +74,21 @@ func searchTerm(filepath string, term string) (matches []FileMatch) {
 	return matches
 }
 
+func Pygmentize(snippet string) (pygmentedSnippet string) {
+
+	var out bytes.Buffer
+	pygmentize := exec.Command("pygmentize", "-f", "html", "-l", "ruby")
+
+	pygmentize.Stdin = strings.NewReader(snippet)
+	pygmentize.Stdout = &out
+
+	pygmentize.Start()
+
+	pygmentize.Wait()
+
+	return string(out.Bytes())
+}
+
 func main() {
 	rubySnippet := `
     def foobar(a, b)
@@ -86,34 +101,15 @@ func main() {
       end
     end
   `
-	var out bytes.Buffer
-	var err error
-	echo := exec.Command("echo", rubySnippet)
-	pygmentize := exec.Command("pygmentize", "-f", "html", "-l", "ruby")
+  fmt.Printf("\n%s", Pygmentize(rubySnippet))
+	/* dirName := "/Users/bertrand/Programming/wendigo/test" */
+	/* filepaths := make(chan string) */
 
-	pygmentize.Stdin, err = echo.StdoutPipe()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	pygmentize.Stdout = &out
+	/* go recursiveWalk(dirName, filepaths) */
 
-	echo.Start()
-	pygmentize.Start()
-
-	echo.Wait()
-	pygmentize.Wait()
-
-	fmt.Printf("%s", string(out.Bytes()))
-
-	dirName := "/Users/bertrand/Programming/wendigo/test"
-	filepaths := make(chan string)
-
-	go recursiveWalk(dirName, filepaths)
-
-	for path := range filepaths {
-		for _, match := range searchTerm(path, "assignments") {
-			fmt.Println(match.String())
-		}
-	}
+	/* for path := range filepaths { */
+	/* 	for _, match := range searchTerm(path, "assignments") { */
+	/* 		fmt.Println(match.String()) */
+	/* 	} */
+	/* } */
 }
