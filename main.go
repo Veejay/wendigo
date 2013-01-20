@@ -17,44 +17,7 @@ type FileMatch struct {
 	matchRegion []string
 }
 
-// TODO: We might want to add a colorize function to format the matches for the terminal
-// Ou alors tout simplement créer un objet HTMLFormatter/TerminalFormatter
-func (match FileMatch) String() string {
-	return fmt.Sprintf("\nMatch found in %s\n%d:\t%s",
-		match.fileName,
-		match.lineNumber,
-		strings.Replace(strings.Join(match.matchRegion, "\n"), "work_week", "[31;43mwork_week[0m", -1))
-}
-
-func walk(path string, filepaths chan<- string) {
-	dir, err := os.Open(path)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer dir.Close()
-	contents, err := dir.Readdir(0)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	for _, f := range contents {
-		path := filepath.Join(path, f.Name())
-		if f.IsDir() {
-			walk(path, filepaths)
-		} else {
-			filepaths <- path
-		}
-	}
-}
-
-func recursiveWalk(path string, filepaths chan<- string) {
-	walk(path, filepaths)
-	close(filepaths)
-}
-
-func searchTerm(filepath string, term string) (matches []FileMatch) {
-	// Read the file
+func searchTerm(filepath string, term string, matches chan<- FileMatch, done chan<- bool) {
 	contents, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		log.Println(err)
@@ -68,10 +31,11 @@ func searchTerm(filepath string, term string) (matches []FileMatch) {
 
 	for lineNumber, line := range lines {
 		if strings.Contains(line, term) {
-			matches = append(matches, FileMatch{fileName: filepath, lineNumber: lineNumber, matchRegion: lines[lineNumber-2 : lineNumber+2]})
+      m := FileMatch{fileName: filepath, lineNumber: lineNumber, matchRegion: lines[lineNumber-2 : lineNumber+2]}
+			matches <- m
 		}
 	}
-	return matches
+  done <- true
 }
 
 func Pygmentize(snippet string) (pygmentedSnippet string) {
@@ -89,27 +53,12 @@ func Pygmentize(snippet string) (pygmentedSnippet string) {
 	return string(out.Bytes())
 }
 
+func ProcessPath(path string, fi os.FileInfo, err error) error {
+  fmt.Printf("Name: \t%s\n", fi.Name())
+  return nil
+}
+
 func main() {
-	rubySnippet := `
-    def foobar(a, b)
-      if b
-        a.inject(0) do |memo, element|
-          memo += element.fuux
-        end
-      else
-        -1
-      end
-    end
-  `
-  fmt.Printf("\n%s", Pygmentize(rubySnippet))
-	/* dirName := "/Users/bertrand/Programming/wendigo/test" */
-	/* filepaths := make(chan string) */
-
-	/* go recursiveWalk(dirName, filepaths) */
-
-	/* for path := range filepaths { */
-	/* 	for _, match := range searchTerm(path, "assignments") { */
-	/* 		fmt.Println(match.String()) */
-	/* 	} */
-	/* } */
+	dirName := "/Users/bertrand/Programming/wendigo/test"
+  filepath.Walk(dirName, ProcessPath)
 }
