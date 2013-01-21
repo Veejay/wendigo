@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type FileMatch struct {
@@ -17,7 +18,11 @@ type FileMatch struct {
 	matchRegion []string
 }
 
-func searchTerm(filepath string, term string, matches chan<- FileMatch, done chan<- bool) {
+func (match FileMatch) String() string {
+	return strings.Join(match.matchRegion, "\n")
+}
+
+func searchTerm(filepath string, term string) (matches []FileMatch) {
 	contents, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		log.Println(err)
@@ -31,11 +36,10 @@ func searchTerm(filepath string, term string, matches chan<- FileMatch, done cha
 
 	for lineNumber, line := range lines {
 		if strings.Contains(line, term) {
-      m := FileMatch{fileName: filepath, lineNumber: lineNumber, matchRegion: lines[lineNumber-2 : lineNumber+2]}
-			matches <- m
+			matches = append(matches, FileMatch{fileName: filepath, lineNumber: lineNumber, matchRegion: lines[lineNumber-2 : lineNumber+2]})
 		}
 	}
-  done <- true
+	return matches
 }
 
 func Pygmentize(snippet string) (pygmentedSnippet string) {
@@ -53,16 +57,41 @@ func Pygmentize(snippet string) (pygmentedSnippet string) {
 	return string(out.Bytes())
 }
 
-func ProcessPath(path string, fi os.FileInfo, err error) error {
-  // We don't process directories.
-  // And I don't care for those silly symbolic links either :/
-  if !(fi.IsDir() || ((fi.Mode() & os.ModeSymlink) > 0)) {
-    fmt.Printf("Full Path: \t%s\nName: \t%s\n", path, fi.Name())
-  }
-  return nil
-}
-
 func main() {
-	dirName := "/Users/bertrand/Programming/wendigo/test"
-  filepath.Walk(dirName, ProcessPath)
+	directoryPath := "/Users/bertrand/Programming/wendigo/test"
+
+	// Empty slice of strings, will eventually contain the paths to the files
+	// gathered by the recursive walk of the directory
+	paths := []string{}
+	var wg sync.WaitGroup
+
+	filepath.Walk(directoryPath, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			panic(err)
+		}
+		// TODO: Take care of the symbolic links as well 
+		// See os.ModeSymlink
+		if !fi.IsDir() {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+
+	for _, path := range paths {
+		wg.Add(1)
+		// Calls Done() on the waiting to indicate that the task has been completed
+		// but since the work is not being done sequentially, the goroutine itself needs to send that 
+		// signal
+		go func(path string) {
+			matches := searchTerm(path, "assignments")
+			for _, match := range matches {
+				fmt.Println(Pygmentize(match.String()))
+			}
+			wg.Done()
+		}(path)
+	}
+	// Since all the jobs are launched in goroutines, nothing will block
+	// needs to wait for everything to finish before exiting the program 
+	wg.Wait()
+	fmt.Println("Done processing all the files")
 }
