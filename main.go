@@ -54,7 +54,11 @@ func Pygmentize(snippet string) (pygmentedSnippet string) {
 }
 
 func ProcessPath(path string, fi os.FileInfo, err error) error {
-  fmt.Printf("Name: \t%s\n", fi.Name())
+  // We don't process directories.
+  // And I don't care for those silly symbolic links either :/
+  if !(fi.IsDir() || ((fi.Mode() & os.ModeSymlink) > 0)) {
+    fmt.Printf("Full Path: \t%s\nName: \t%s\n", path, fi.Name())
+  }
   return nil
 }
 
